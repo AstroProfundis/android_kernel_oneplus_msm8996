@@ -542,6 +542,10 @@ ktime_t __ktime_get(void)
 	ktime_t base;
 	s64 nsecs;
 
+#ifndef CONFIG_MACH_MSM8996_15801
+	WARN_ON(timekeeping_suspended);
+#endif
+
 	do {
 		seq = read_seqcount_begin(&tk_core.seq);
 		base = tk->tkr.base_mono;
