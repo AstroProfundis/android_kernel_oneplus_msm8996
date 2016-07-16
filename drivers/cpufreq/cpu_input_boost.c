@@ -42,7 +42,14 @@ static struct workqueue_struct *boost_wq;
 static struct work_struct boost_work;
 static struct delayed_work restore_work;
 
-static bool boost_running;
+struct boost_policy {
+	spinlock_t lock;
+	struct fb_policy fb;
+	struct ib_config ib;
+	struct workqueue_struct *wq;
+	uint8_t enabled;
+	bool device_awake;
+};
 
 static u64 last_input_time;
 #define MIN_INPUT_INTERVAL (150 * USEC_PER_MSEC)
@@ -177,13 +184,24 @@ finish_boost:
 
 static void __cpuinit cpu_restore_main(struct work_struct *work)
 {
-	cpu_unboost_all();
-}
+	struct boost_policy *b = boost_policy_g;
+	struct fb_event *evdata = data;
+	int *blank = evdata->data;
 
-static int cpu_do_boost(struct notifier_block *nb, unsigned long val, void *data)
-{
-	struct cpufreq_policy *policy = data;
-	struct boost_policy *b = &per_cpu(boost_info, policy->cpu);
+	/* Only boost for unblank (i.e. when device is woken) */
+	if (val != FB_EARLY_EVENT_BLANK)
+		return NOTIFY_OK;
+
+	/* Keep track of suspend state */
+	if (*blank == FB_BLANK_UNBLANK) {
+		b->device_awake = 1;
+	} else {
+		b->device_awake = 0;
+		return NOTIFY_OK;
+	}
+
+	if (!is_driver_enabled(b))
+		return NOTIFY_OK;
 
 	if (val != CPUFREQ_ADJUST)
 		return NOTIFY_OK;
@@ -212,9 +230,17 @@ static void cpu_boost_input_event(struct input_handle *handle, unsigned int type
 {
 	u64 now;
 
-	if (boost_running)
+	/* Anticipate device wake-up and boost early */
+	if (!b->device_awake) {
+		queue_work(b->wq, &b->fb.boost_work);
 		return;
-	if (!enabled)
+	}
+
+	spin_lock(&b->lock);
+	do_boost = b->enabled && !b->fb.state && !b->ib.running;
+	spin_unlock(&b->lock);
+
+	if (!do_boost)
 		return;
 
 	now = ktime_to_us(ktime_get());
