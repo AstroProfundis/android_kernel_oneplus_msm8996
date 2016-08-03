@@ -1707,6 +1707,19 @@ static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
 	schedule_work(&hap->td_work);
 }
 
+/* enable interface from timed output class */
+static void qpnp_hap_td_enable(struct timed_output_dev *dev, int value)
+{
+	struct qpnp_hap *hap = container_of(dev, struct qpnp_hap,
+					 timed_dev);
+
+	spin_lock(&hap->td_lock);
+	hap->td_value = value;
+	spin_unlock(&hap->td_lock);
+
+	schedule_work(&hap->td_work);
+}
+
 /* play pwm bytes */
 int qpnp_hap_play_byte(u8 data, bool on)
 {
