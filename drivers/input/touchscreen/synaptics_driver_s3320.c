@@ -1368,9 +1368,6 @@ void int_touch(void)
 
 	if (finger_num == 0/* && last_status && (check_key <= 1)*/)
 	{
-#ifdef CONFIG_BOEFFLA_TOUCH_KEY_CONTROL
-		btkc_touch_stop();
-#endif
 		input_report_key(ts->input_dev, BTN_TOOL_FINGER, 0);
 #ifndef TYPE_B_PROTOCOL
 		input_mt_sync(ts->input_dev);
