@@ -93,10 +93,6 @@ struct fpc1020_data {
 	struct notifier_block fb_notif;
     #endif
 	struct work_struct pm_work;
-	int proximity_state; /* 0:far 1:near */
-	bool irq_enabled;
-	spinlock_t irq_lock;
-	struct delayed_work status_work;
 };
 
 static int fpc1020_request_named_gpio(struct fpc1020_data *fpc1020,
@@ -473,37 +469,12 @@ static ssize_t screen_state_get(struct device* device,
 
 static DEVICE_ATTR(screen_state, S_IRUSR , screen_state_get, NULL);
 
-static ssize_t proximity_state_set(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
-{
-	struct fpc1020_data *fpc1020 = dev_get_drvdata(dev);
-	int rc, val;
-
-	rc = kstrtoint(buf, 10, &val);
-	if (rc)
-		return -EINVAL;
-
-	fpc1020->proximity_state = !!val;
-
-	if (!fpc1020->screen_state) {
-		fpc1020_set_irq(fpc1020, !fpc1020->proximity_state);
-		if (!fpc1020->proximity_state)
-			schedule_delayed_work(&fpc1020->status_work,
-						msecs_to_jiffies(50));
-	}
-
-	return count;
-}
-
-static DEVICE_ATTR(proximity_state, S_IWUSR, NULL, proximity_state_set);
-
 static struct attribute *attributes[] = {
 	&dev_attr_hw_reset.attr,
 	&dev_attr_irq.attr,
 	&dev_attr_report_home.attr,
 	&dev_attr_update_info.attr,
 	&dev_attr_screen_state.attr,
-	&dev_attr_proximity_state.attr,
 	NULL
 };
 
@@ -629,13 +600,6 @@ static irqreturn_t fpc1020_irq_handler(int irq, void *handle)
 	input_report_key(fpc1020->input_dev, KEY_FINGERPRINT, 0);
 	input_sync(fpc1020->input_dev);
 
-	if (!fpc1020->screen_state) {
-		input_report_key(fpc1020->input_dev, KEY_FINGERPRINT, 1);
-		input_sync(fpc1020->input_dev);
-		input_report_key(fpc1020->input_dev, KEY_FINGERPRINT, 0);
-		input_sync(fpc1020->input_dev);
-	}
-
 	return IRQ_HANDLED;
 }
 
@@ -643,6 +607,7 @@ static int fpc1020_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	int rc = 0;
+	int irqf;
 	struct device_node *np = dev->of_node;
 
 	struct fpc1020_data *fpc1020 = devm_kzalloc(dev, sizeof(*fpc1020),
@@ -740,6 +705,14 @@ static int fpc1020_probe(struct platform_device *pdev)
 		dev_err(dev, "could not enable irq\n");
 		goto exit;
 	}
+	dev_info(dev, "requested irq %d\n", gpio_to_irq(fpc1020->irq_gpio));
+
+	/* Request that the interrupt should not be wakeable */
+	//disable_irq_wake( gpio_to_irq( fpc1020->irq_gpio ) );
+
+	enable_irq_wake( gpio_to_irq( fpc1020->irq_gpio ) );
+	wake_lock_init(&fpc1020->ttw_wl, WAKE_LOCK_SUSPEND, "fpc_ttw_wl");
+	device_init_wakeup(fpc1020->dev, 1);
 
 	rc = sysfs_create_group(&dev->kobj, &attribute_group);
 	if (rc) {
