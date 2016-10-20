@@ -95,6 +95,9 @@ struct fpc1020_data {
 	struct notifier_block fb_notif;
     #endif
 	struct work_struct pm_work;
+	int proximity_state; /* 0:far 1:near */
+	bool irq_enabled;
+	spinlock_t irq_lock;
 };
 
 static int fpc1020_request_named_gpio(struct fpc1020_data *fpc1020,
@@ -267,7 +270,15 @@ static ssize_t irq_get(struct device* device,
 			     char* buffer)
 {
 	struct fpc1020_data* fpc1020 = dev_get_drvdata(device);
-	int irq = gpio_get_value(fpc1020->irq_gpio);
+	bool irq_enabled;
+	int irq;
+
+	spin_lock(&fpc1020->irq_lock);
+	irq_enabled = fpc1020->irq_enabled;
+	spin_unlock(&fpc1020->irq_lock);
+
+	irq = irq_enabled && gpio_get_value(fpc1020->irq_gpio);
+
 	return scnprintf(buffer, PAGE_SIZE, "%i\n", irq);
 }
 
@@ -292,6 +303,24 @@ extern bool s1302_is_keypad_stopped(void);
 
 bool key_home_pressed = false;
 EXPORT_SYMBOL(key_home_pressed);
+
+static void set_fpc_irq(struct fpc1020_data *fpc1020, bool enable)
+{
+	bool irq_enabled;
+
+	spin_lock(&fpc1020->irq_lock);
+	irq_enabled = fpc1020->irq_enabled;
+	fpc1020->irq_enabled = enable;
+	spin_unlock(&fpc1020->irq_lock);
+
+	if (enable == irq_enabled)
+		return;
+
+	if (enable)
+		enable_irq(gpio_to_irq(fpc1020->irq_gpio));
+	else
+		disable_irq(gpio_to_irq(fpc1020->irq_gpio));
+}
 
 static ssize_t report_home_set(struct device *dev,
 	struct device_attribute *attr, const char *buf, size_t count)
@@ -369,6 +398,26 @@ static ssize_t screen_state_get(struct device* device,
 }
 
 static DEVICE_ATTR(screen_state, S_IRUSR , screen_state_get, NULL);
+
+static ssize_t proximity_state_set(struct device *dev,
+	struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct  fpc1020_data *fpc1020 = dev_get_drvdata(dev);
+	int rc, val;
+
+	rc = kstrtoint(buf, 10, &val);
+	if (rc)
+		return -EINVAL;
+
+	fpc1020->proximity_state = !!val;
+
+	if (!fpc1020->screen_state)
+		set_fpc_irq(fpc1020, !fpc1020->proximity_state);
+
+	return count;
+}
+
+static DEVICE_ATTR(proximity_state, S_IWUSR, NULL, proximity_state_set);
 
 static struct attribute *attributes[] = {
 	&dev_attr_hw_reset.attr,
@@ -451,10 +500,12 @@ static void fpc1020_suspend_resume(struct work_struct *work)
 		container_of(work, typeof(*fpc1020), pm_work);
 
 	/* Escalate fingerprintd priority when screen is off */
-	if (fpc1020->screen_state)
+	if (fpc1020->screen_state) {
+		set_fpc_irq(fpc1020, true);
 		set_fingerprintd_nice(0);
-	else
+	} else {
 		set_fingerprintd_nice(MIN_NICE);
+	}
 
 	sysfs_notify(&fpc1020->dev->kobj, NULL,
 				dev_attr_screen_state.attr.name);
@@ -593,6 +644,9 @@ static int fpc1020_probe(struct platform_device *pdev)
 		dev_err(fpc1020->dev, "Unable to register fb_notifier: %d\n", rc);
     fpc1020->screen_state = 1;
     #endif
+
+	spin_lock_init(&fpc1020->irq_lock);
+	fpc1020->irq_enabled = true;
 
 	irqf = IRQF_TRIGGER_RISING | IRQF_ONESHOT;
 	mutex_init(&fpc1020->lock);
