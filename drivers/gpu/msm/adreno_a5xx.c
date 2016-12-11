@@ -15,6 +15,10 @@
 #include <soc/qcom/scm.h>
 #include <linux/pm_opp.h>
 
+#ifdef CONFIG_MACH_MSM8996_15801
+#include <soc/qcom/socinfo.h>
+#endif
+
 #include "adreno.h"
 #include "a5xx_reg.h"
 #include "adreno_a5xx.h"
@@ -2364,6 +2368,71 @@ static int a5xx_microcode_read(struct adreno_device *adreno_dev)
 	_load_regfile(adreno_dev);
 
 	return ret;
+}
+
+/*
+ * a5xx_microcode_load() - Load microcode
+ * @adreno_dev: Pointer to adreno device
+ * @start_type: type of device start cold/warm
+ */
+static int a5xx_microcode_load(struct adreno_device *adreno_dev,
+				unsigned int start_type)
+{
+	void *ptr;
+	struct kgsl_device *device = KGSL_DEVICE(adreno_dev);
+	uint64_t gpuaddr;
+
+	gpuaddr = adreno_dev->pm4.gpuaddr;
+	kgsl_regwrite(device, A5XX_CP_PM4_INSTR_BASE_LO,
+				lower_32_bits(gpuaddr));
+	kgsl_regwrite(device, A5XX_CP_PM4_INSTR_BASE_HI,
+				upper_32_bits(gpuaddr));
+
+	gpuaddr = adreno_dev->pfp.gpuaddr;
+	kgsl_regwrite(device, A5XX_CP_PFP_INSTR_BASE_LO,
+				lower_32_bits(gpuaddr));
+	kgsl_regwrite(device, A5XX_CP_PFP_INSTR_BASE_HI,
+				upper_32_bits(gpuaddr));
+
+	/*
+	 * Resume call to write the zap shader base address into the
+	 * appropriate register
+	 */
+	if (zap_ucode_loaded) {
+		int ret;
+		struct scm_desc desc = {0};
+
+		desc.args[0] = 0;
+		desc.args[1] = 13;
+		desc.arginfo = SCM_ARGS(2);
+
+		ret = scm_call2(SCM_SIP_FNID(SCM_SVC_BOOT, 0xA), &desc);
+		if (ret) {
+			pr_err("SCM resume call failed with error %d\n", ret);
+			return ret;
+		}
+
+	}
+
+	/* Load the zap shader firmware through PIL if its available */
+	if (adreno_dev->gpucore->zap_name && !zap_ucode_loaded) {
+#ifdef CONFIG_MACH_MSM8996_15801
+		if (socinfo_get_id() == 305) /* MSM8996pro */
+			ptr = subsystem_get("a530_zap-pro");
+		else
+			ptr = subsystem_get(adreno_dev->gpucore->zap_name);
+#else
+		ptr = subsystem_get(adreno_dev->gpucore->zap_name);
+#endif
+
+		/* Return error if the zap shader cannot be loaded */
+		if (IS_ERR_OR_NULL(ptr))
+			return (ptr == NULL) ? -ENODEV : PTR_ERR(ptr);
+
+		zap_ucode_loaded = 1;
+	}
+
+	return 0;
 }
 
 static struct adreno_perfcount_register a5xx_perfcounters_cp[] = {
