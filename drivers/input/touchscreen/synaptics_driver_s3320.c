@@ -34,6 +34,8 @@
 #include <linux/pinctrl/pinctrl.h>
 #include <linux/pinctrl/machine.h>
 
+#include <linux/qdsp6v2/apr.h>
+
 #include <linux/kthread.h>
 #include <linux/random.h>
 #include <linux/slab.h>
@@ -1227,19 +1229,13 @@ static void gesture_judge(struct synaptics_ts_data *ts)
         ||(gesture == Circle && Circle_gesture)||(gesture == DouSwip && DouSwip_gesture)){
 
 		gesture_upload = gesture;
-		input_report_key(ts->input_dev, keyCode, 1);
-		input_sync(ts->input_dev);
-		input_report_key(ts->input_dev, keyCode, 0);
-		input_sync(ts->input_dev);
-	}
-    else if ((gesture == Left2RightSwip && Left2RightSwip_gesture)||(gesture == Right2LeftSwip && Right2LeftSwip_gesture)\
-			||(gesture == Up2DownSwip && Up2DownSwip_gesture)||(gesture == Down2UpSwip && Down2UpSwip_gesture))
-    {
-		// press powerkey
-		boeffla_press_powerkey();
-	}
-	else
-	{
+		if (!ts->gestures_disabled || !q6voice_voice_call_active()) {
+			input_report_key(ts->input_dev, keyCode, 1);
+			input_sync(ts->input_dev);
+			input_report_key(ts->input_dev, keyCode, 0);
+			input_sync(ts->input_dev);
+		}
+	}else{
 
 		ret = i2c_smbus_read_i2c_block_data( ts->client, F12_2D_CTRL20, 3, &(reportbuf[0x0]) );
 		ret = reportbuf[2] & 0x20;
