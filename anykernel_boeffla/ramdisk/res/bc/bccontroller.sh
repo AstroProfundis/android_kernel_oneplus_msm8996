@@ -3,7 +3,7 @@
 # Boeffla-Config controller interface
 #
 # *******************************
-# Oneplus 3 CM13 version
+# Oneplus 3 Lineage13 version
 #
 # V0.1
 # *******************************
@@ -13,7 +13,7 @@
 # ********************************
 
 # kernel specification (hardware; type; target; url)
-KERNEL_SPECS="oneplus3;cm;cm13.0;http://kernel.boeffla.de/oneplus3/boeffla-kernel-cm/;boeffla-kernel-#VERSION#-CM13.0-OnePlus3-anykernel.recovery.zip"
+KERNEL_SPECS="oneplus3;cm;cm13.0;http://kernel.boeffla.de/oneplus3/boeffla-kernel-cm/;boeffla-kernel-#VERSION#-Lineage13.0-OnePlus3-anykernel.recovery.zip"
 
 # kernel features 
 # (1=enable-busybox,2=enable-frandom,3=wipe-cache,4=disable-zram-control)
