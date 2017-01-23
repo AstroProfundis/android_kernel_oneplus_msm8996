@@ -10,9 +10,9 @@
 # Parameters to be configured manually
 #######################################
 
-BOEFFLA_VERSION="1.0-test-CM13.0-OnePlus3"
+BOEFFLA_VERSION="1.2-CM13.0-OnePlus3"
 
-TOOLCHAIN="/opt/toolchains/aarch64-linux-android-4.9/bin/aarch64-linux-android-"
+TOOLCHAIN="/opt/toolchains/aarch64-linux-android-6.x/bin/aarch64-linux-android-"
 ARCHITECTURE=arm64
 COMPILER_FLAGS_KERNEL=""
 COMPILER_FLAGS_MODULE=""
