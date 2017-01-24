@@ -75,7 +75,7 @@ if [ -f ~/x-settings.sh ]; then
 	. ~/x-settings.sh
 fi
 
-BOEFFLA_FILENAME="${KERNEL_NAME,,}-$BOEFFLA_VERSION"
+BOEFFLA_FILENAME="${KERNEL_NAME,,}-$BOEFFLA_VERSION-$BOEFFLA_DATE"
 
 # set environment
 export ARCH=$ARCHITECTURE
