@@ -4008,6 +4008,13 @@ static const struct mmc_fixup blk_fixups[] =
 		  MMC_QUIRK_LONG_READ_TIME),
 
 	/*
+	 * Hynix eMMC cards need longer data read timeout than
+	 * indicated in CSD.
+	 */
+	MMC_FIXUP(CID_NAME_ANY, CID_MANFID_HYNIX, CID_OEMID_ANY, add_quirk_mmc,
+		  MMC_QUIRK_LONG_READ_TIME),
+
+	/*
 	 * On these Samsung MoviNAND parts, performing secure erase or
 	 * secure trim can result in unrecoverable corruption due to a
 	 * firmware bug.
@@ -4098,14 +4105,7 @@ static int mmc_blk_probe(struct mmc_card *card)
 	}
 
 	pm_runtime_set_autosuspend_delay(&card->dev, MMC_AUTOSUSPEND_DELAY_MS);
-	/*
-	 * If there is a runtime_idle function, it should take care of
-	 * suspending the card
-	 */
-	if (card->host->bus_ops->runtime_idle)
-		pm_runtime_dont_use_autosuspend(&card->dev);
-	else
-		pm_runtime_use_autosuspend(&card->dev);
+	pm_runtime_use_autosuspend(&card->dev);
 
 	/*
 	 * Don't enable runtime PM for SD-combo cards here. Leave that
