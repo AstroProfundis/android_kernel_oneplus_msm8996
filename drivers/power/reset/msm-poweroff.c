@@ -34,8 +34,6 @@
 #include <soc/qcom/restart.h>
 #include <soc/qcom/watchdog.h>
 
-#include <linux/param_rw.h>
-
 #define EMERGENCY_DLOAD_MAGIC1    0x322A4F99
 #define EMERGENCY_DLOAD_MAGIC2    0xC67E4350
 #define EMERGENCY_DLOAD_MAGIC3    0x77777777
@@ -47,21 +45,6 @@
 #define SCM_DLOAD_MODE			0X10
 #define SCM_EDLOAD_MODE			0X01
 #define SCM_DLOAD_CMD			0x10
-
-#define DEVICE_INFO_SIZE 2048
-/*Define a global pointer which points to the boot shared imem cookie structure */
-char oem_pcba_number[28];
-char device_info[DEVICE_INFO_SIZE];
-extern char oem_serialno[16];
-extern char oem_hw_version[3];
-extern char oem_rf_version[3];
-extern char oem_ddr_manufacture_info[16];
-extern char oem_ufs_manufacture_info[16];
-extern char oem_ufs_fw_version[3];
-
-extern uint32_t chip_serial_num;
-
-extern struct boot_shared_imem_cookie_type *boot_shared_imem_cookie_ptr;
 
 static int restart_mode;
 static void *restart_reason, *dload_type_addr;
@@ -580,29 +563,6 @@ static int msm_restart_probe(struct platform_device *pdev)
 		emergency_dload_mode_addr = of_iomap(np, 0);
 		if (!emergency_dload_mode_addr)
 			pr_err("unable to map imem EDLOAD mode offset\n");
-	}
-
-	get_param_pcba_number(oem_pcba_number);
-	sprintf(device_info,
-		"hardware version: %s\r\n"
-		"rf version: %s\r\n"
-		"socinfo serial_number: %u\r\n"
-		"ddr manufacturer: %s\r\n"
-		"ufs manufacturer: %s\r\n"
-		"ufs firmware version: %s\r\n"
-		"pcba number: %s\r\n"
-		"serial number: %s\r\n"
-		"kernel version: %s\r\n"
-		"boot command: %s\r\n",
-		oem_hw_version, oem_rf_version, chip_serial_num, oem_ddr_manufacture_info, oem_ufs_manufacture_info, oem_ufs_fw_version,
-		oem_pcba_number+1, oem_serialno, linux_banner, saved_command_line);
-	boot_shared_imem_cookie_ptr = ioremap(SHARED_IMEM_BOOT_BASE, sizeof(struct boot_shared_imem_cookie_type));
-	if(!boot_shared_imem_cookie_ptr)
-		pr_err("unable to map imem DLOAD mode offset for OEM usages\n");
-	else
-	{
-		__raw_writel(virt_to_phys(device_info), &(boot_shared_imem_cookie_ptr->device_info_addr));
-		__raw_writel(strlen(device_info), &(boot_shared_imem_cookie_ptr->device_info_size));
 	}
 
 	np = of_find_compatible_node(NULL, NULL,
