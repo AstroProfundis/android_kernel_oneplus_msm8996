@@ -10,9 +10,9 @@
 # Parameters to be configured manually
 #######################################
 
-BOEFFLA_VERSION="1.0-test-CM14.0-OnePlus3"
+BOEFFLA_VERSION="1.2-CM13.0-OnePlus3"
 
-TOOLCHAIN="/opt/toolchains/aarch64-linux-android-4.9-20150123/bin/aarch64-linux-android-"
+TOOLCHAIN="/opt/toolchains/aarch64-linux-android-6.x/bin/aarch64-linux-android-"
 ARCHITECTURE=arm64
 COMPILER_FLAGS_KERNEL=""
 COMPILER_FLAGS_MODULE=""
@@ -75,7 +75,7 @@ if [ -f ~/x-settings.sh ]; then
 	. ~/x-settings.sh
 fi
 
-BOEFFLA_FILENAME="${KERNEL_NAME,,}-$BOEFFLA_VERSION"
+BOEFFLA_FILENAME="${KERNEL_NAME,,}-$BOEFFLA_VERSION-$BOEFFLA_DATE"
 
 # set environment
 export ARCH=$ARCHITECTURE
@@ -100,7 +100,7 @@ step0_copy_code()
 
 	# Replace version information in mkcompile_h with the one from x-settings.sh
 	sed "s/\`echo \$LINUX_COMPILE_BY | \$UTS_TRUNCATE\`/$KERNEL_NAME-$BOEFFLA_VERSION-$BOEFFLA_DATE/g" -i $BUILD_PATH/scripts/mkcompile_h
-	sed "s/\`echo \$LINUX_COMPILE_HOST | \$UTS_TRUNCATE\`/andip71/g" -i $BUILD_PATH/scripts/mkcompile_h
+	sed "s/\`echo \$LINUX_COMPILE_HOST | \$UTS_TRUNCATE\`/atr.moe/g" -i $BUILD_PATH/scripts/mkcompile_h
 }
 
 step1_make_clean()
